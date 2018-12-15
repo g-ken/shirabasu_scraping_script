@@ -3,6 +3,7 @@ require 'open-uri'
 require 'csv'
 require 'uri'
 require 'benchmark'
+require 'typhoeus'
 
 BASE_URL = "https://syllabus.kosen-k.go.jp"
 
@@ -19,7 +20,7 @@ def get_school
   uri = "https://syllabus.kosen-k.go.jp/Pages/PublicSchools"
   doc = request_parsed_html(uri)
 
-  doc.xpath('//div[not(contains(@style, "display:none"))]/div[@class="btn btn-default"]').each do |node|
+  doc.xpath('//div[not(@style="display:none")]/div[@class="btn btn-default"]').each do |node|
     node.css('a').each do |link|
       next_uri = BASE_URL + link[:href]
       get_department_id(next_uri)
@@ -28,6 +29,7 @@ def get_school
 end
 
 def get_department_id(uri)
+  puts uri
   department_name = String.new
 
   doc = request_parsed_html(uri)
@@ -75,31 +77,33 @@ def get_bg_success(uri,file_name)
     node.xpath('tr[@class="bg-success"]/th').each do |child_node|
       row << child_node.inner_text
     end
+
     node.xpath('tr[not(@*)]/th').each do |child_node|
       column << child_node.inner_text
     end
-  end
 
-  table = Array.new(column.count).map{Array.new(row.count+2, nil)}
-  subject_title = doc.at('//h1').inner_text
-  doc.xpath('//table[@id="MainContent_SubjectSyllabus_wariaiTable"]').each_with_index do |node, i|
+    table = Array.new(column.count).map{Array.new(row.count+2, nil)}
+    subject_title = doc.at('//h1').inner_text
+
     node.xpath('tr[not(@*)]').each.with_index(0) do |child_node, j|
       child_node.xpath('*').each.with_index(1) do |grandson_node, k|
         table[j][k] = grandson_node.inner_text
       end
     end
-  end
-  
-  CSV.open("./shirabasu/#{file_name}.csv", "a") do |csv|
-    csv << [subject_title]
-    csv << row
-    table.each do |chile_table|
-      csv << chile_table
+
+    CSV.open("./shirabasu/#{file_name}.csv", "a") do |csv|
+      csv << [subject_title]
+      csv << row
+      table.each do |chile_table|
+        csv << chile_table
+      end
+      csv << []
     end
-    csv << []
   end
 end
 
-Benchmark.bm do |bm|
-  bm.report { get_school }
-end
+#Benchmark.bm do |bm|
+#  bm.report { get_school }
+#end
+get_school
+#get_department_id("https://syllabus.kosen-k.go.jp/Pages/PublicDepartments?school_id=23&year=2018")
