@@ -106,4 +106,3 @@ end
 #  bm.report { get_school }
 #end
 get_school
-#get_department_id("https://syllabus.kosen-k.go.jp/Pages/PublicDepartments?school_id=23&year=2018")
