@@ -1,9 +1,12 @@
 require 'nokogiri'
+require 'typhoeus' #Thread request uri
+require 'parallel' #Process exec
+
+require 'uri' #To encode uri
 require 'open-uri'
 require 'csv'
-require 'uri'
 require 'benchmark'
-require 'typhoeus'
+
 
 BASE_URL = "https://syllabus.kosen-k.go.jp"
 
@@ -19,6 +22,7 @@ end
 def get_school
   uri = "https://syllabus.kosen-k.go.jp/Pages/PublicSchools"
   doc = request_parsed_html(uri)
+  #puts "get_school"
 
   doc.xpath('//div[not(@style="display:none")]/div[@class="btn btn-default"]').each do |node|
     node.css('a').each do |link|
@@ -29,7 +33,9 @@ def get_school
 end
 
 def get_department_id(uri)
+  #puts "get_department_id"
   department_name = String.new
+  department_list = Array.new
 
   doc = request_parsed_html(uri)
   file_name = doc.at('//h1').inner_text
@@ -41,36 +47,56 @@ def get_department_id(uri)
       department_name = node.xpath('h4[@class="list-group-item-heading"]').inner_text
     end
     node.parent.css('a').each do |link|
-      if link[:href].include?("Subjects")
-        next_uri= BASE_URL + link[:href]
-        get_subject_code(next_uri, file_name)
-      else
-        next
-      end
+      next unless link[:href].include?("Subjects")
+      department_list << BASE_URL + link[:href]
     end
   end
+  Parallel.each(department_list, in_processes: 4) do |next_uri|
+    get_subject_code(next_uri, file_name)
+  end
+  #department_list.each do |next_uri|
+  #  get_subject_code(next_uri, file_name)
+  #end
 end
 
 def get_subject_code(uri, file_name)
-  charset = nil
+  requests = Array.new
+  hydra = Typhoeus::Hydra.hydra
+  #puts "get_subject_code"
+
   doc = request_parsed_html(uri)
   file_name += ("_" + doc.at('//h1').inner_text)
+
   doc.xpath('//tr[@class="course- "]/td').each do |node|
     node.xpath('div[@class="subject-item"]').each do |child_node|
-      child_node.css('a').each do |link|
-        next_uri = URI.encode(BASE_URL + (link[:href].gsub(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') })) 
-        get_bg_success(next_uri, file_name)
+      child_node.css('a').map do |link|
+        request = Typhoeus::Request.new(URI.encode(BASE_URL + (link[:href].gsub(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') })))
+        hydra.queue(request)
+        requests << request
       end
     end
   end
+
+  #puts "try hydra run"
+  hydra.run
+  #puts "hydra run"
+
+  responses = requests.map do |request|
+    request.response.body
+  end
+
+  responses.each do |response|
+    get_bg_success(response, file_name)
+  end
+  
 end
 
-def get_bg_success(uri,file_name)
+def get_bg_success(body, file_name)
   row = Array.new(2)
   column = Array.new(1)
   subject_title = Array.new
-
-  doc = request_parsed_html(uri)
+  #puts "get_bg_success"
+  doc = Nokogiri::HTML.parse(body)
   doc.xpath('//table[@id="MainContent_SubjectSyllabus_wariaiTable"]').each do |node|
     node.xpath('tr[@class="bg-success"]/th').each do |child_node|
       row << child_node.inner_text
@@ -100,7 +126,7 @@ def get_bg_success(uri,file_name)
   end
 end
 
-#Benchmark.bm do |bm|
-#  bm.report { get_school }
-#end
-get_subject_code("https://syllabus.kosen-k.go.jp/Pages/PublicSubjects?school_id=23&department_id=15&year=2018", "test")
+Benchmark.bm do |bm|
+  bm.report { get_school }
+end
+#get_subject_code
