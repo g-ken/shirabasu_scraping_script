@@ -29,7 +29,6 @@ def get_school
 end
 
 def get_department_id(uri)
-  puts uri
   department_name = String.new
 
   doc = request_parsed_html(uri)
@@ -54,13 +53,12 @@ end
 
 def get_subject_code(uri, file_name)
   charset = nil
-
   doc = request_parsed_html(uri)
   file_name += ("_" + doc.at('//h1').inner_text)
   doc.xpath('//tr[@class="course- "]/td').each do |node|
     node.xpath('div[@class="subject-item"]').each do |child_node|
       child_node.css('a').each do |link|
-        next_uri = URI.encode(BASE_URL + (link[:href].gsub(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') }))
+        next_uri = URI.encode(BASE_URL + (link[:href].gsub(/\\u([\da-fA-F]{4})/) { [$1].pack('H*').unpack('n*').pack('U*') })) 
         get_bg_success(next_uri, file_name)
       end
     end
@@ -105,4 +103,4 @@ end
 #Benchmark.bm do |bm|
 #  bm.report { get_school }
 #end
-get_school
+get_subject_code("https://syllabus.kosen-k.go.jp/Pages/PublicSubjects?school_id=23&department_id=15&year=2018", "test")
