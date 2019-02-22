@@ -7,7 +7,7 @@ require 'open-uri'
 require 'csv'
 require 'benchmark'
 
-
+DEBUG = false
 BASE_URL = "https://syllabus.kosen-k.go.jp"
 
 def request_parsed_html(uri) #nokogiriでパースしたhtmlを返す
@@ -22,7 +22,7 @@ end
 def get_school
   uri = "https://syllabus.kosen-k.go.jp/Pages/PublicSchools"
   doc = request_parsed_html(uri)
-  #puts "get_school"
+  puts "get_school" if DEBUG
 
   doc.xpath('//div[not(@style="display:none")]/div[@class="btn btn-default"]').each do |node|
     node.css('a').each do |link|
@@ -33,7 +33,7 @@ def get_school
 end
 
 def get_department_id(uri)
-  #puts "get_department_id"
+  puts "get_department_id" if DEBUG
   department_name = String.new
   department_list = Array.new
 
@@ -62,7 +62,7 @@ end
 def get_subject_code(uri, file_name)
   requests = Array.new
   hydra = Typhoeus::Hydra.hydra
-  #puts "get_subject_code"
+  puts "get_subject_code" if DEBUG
 
   doc = request_parsed_html(uri)
   file_name += ("_" + doc.at('//h1').inner_text)
@@ -77,9 +77,9 @@ def get_subject_code(uri, file_name)
     end
   end
 
-  #puts "try hydra run"
+  puts "try hydra run" if DEBUG
   hydra.run
-  #puts "hydra run"
+  puts "hydra run" if DEBUG
 
   responses = requests.map do |request|
     request.response.body
@@ -95,7 +95,7 @@ def get_bg_success(body, file_name)
   row = Array.new(2)
   column = Array.new(1)
   subject_title = Array.new
-  #puts "get_bg_success"
+  puts "get_bg_success" if DEBUG
   doc = Nokogiri::HTML.parse(body)
   doc.xpath('//table[@id="MainContent_SubjectSyllabus_wariaiTable"]').each do |node|
     node.xpath('tr[@class="bg-success"]/th').each do |child_node|
